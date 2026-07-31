@@ -1,93 +1,114 @@
-# ios
+### Swift (iOS)
 
+```swift
+import NexInsightCore
 
+let dbPath = FileManager.default
+    .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    .appendingPathComponent("nexinsight.db").path
 
-## Getting started
+let cfg = EventsdkConfig("APP-UUID", databasePath: dbPath)!
+cfg.setDeviceInfo("iOS", osVersion: UIDevice.current.systemVersion, deviceModel: deviceModel())
+cfg.setAppInfo("MyApp", version: appVersion, build: appBuild)
+cfg.flushIntervalSeconds = 15
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.adtelligent.com/nexinsight/sdk/ios.git
-git branch -M master
-git push -uf origin master
+guard let tracker = EventsdkTracker(cfg) else { return }   // nil if the queue cannot be opened
+try? tracker.trackView("home")
+tracker.onBackground()      // hook to UIApplication.didEnterBackgroundNotification
+try? tracker.close(3000)
 ```
 
-## Integrate with your tools
+Methods that return an error in Go are imported as throwing Swift methods
+(`trackView`, `track`, `identify`, `flush`, `close`); the rest are plain calls.
 
-* [Set up project integrations](https://gitlab.adtelligent.com/nexinsight/sdk/ios/-/settings/integrations)
 
-## Collaborate with your team
+## API
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+| Method                                  | Purpose                                                        |
+|-----------------------------------------|----------------------------------------------------------------|
+| `TrackView(screen)`                     | screen view; also starts the visibility timer                   |
+| `TrackClose(screen, seconds)`           | screen/app close with visibility time                           |
+| `TrackHide(screen, seconds)`            | screen/app backgrounded with visibility time                    |
+| `TrackHideAuto()`                       | hide for the current screen, visibility time computed           |
+| `Identify(otp)`                         | identity sync event                                             |
+| `NewEvent(type)` + `Track(event)`        | full control, incl. `cp1`–`cp7` custom parameters               |
+| `SetScreen(name)` / `CurrentScreen()`   | track the screen without emitting an event                      |
+| `SetUserID(uid)` / `UserID()`           | the `uid` parameter                                             |
+| `SessionID()` / `ResetSession()`        | current session; force a new one (e.g. on logout)               |
+| `InstallID()`                           | stable pseudonymous installation id                             |
+| `OnForeground()` / `OnBackground()`     | lifecycle hooks                                                 |
+| `FlushAsync()` / `Flush(timeoutMillis)` | trigger delivery; the blocking form waits and reports leftovers |
+| `PendingCount()` / `Stats()`            | diagnostics                                                     |
+| `Close(timeoutMillis)`                  | final flush, then release the database                          |
 
-## Test and Deploy
+Only `Flush` and `Close` block; everything else returns immediately and does no
+network or disk I/O on the calling thread. All methods are safe to call from any
+thread.
 
-Use the built-in continuous integration in GitLab.
+## Configuration
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+`NewConfig(appUUID, databasePath)` fills in the defaults below; override the
+fields you need. `DatabasePath` must be in the app's private storage
+(`context.getFilesDir()` / Application Support).
 
-***
+| Field                                        | Default                        | Notes                                            |
+|----------------------------------------------|--------------------------------|--------------------------------------------------|
+| `Endpoint`                                   | `https://a.nexinsight.com.ua/` | must be an absolute http(s) URL                  |
+| `BatchEndpoint`                              | `Endpoint` path + `batch`      | override for a proxy with its own routing        |
+| `UserAgent`                                  | synthesised                    | pass the platform WebView UA when possible       |
+| `UserAgentSuffix`                            | from `AppName`/`AppVersion`    | appended verbatim                                |
+| `OSName`, `OSVersion`, `DeviceModel`         | empty                          | used to synthesise the UA and platform version   |
+| `SessionTimeoutSeconds`                      | `1800`                         | inactivity window before a new session           |
+| `BatchSize`                                  | `50`                           | events picked up per delivery cycle              |
+| `MaxBatchEvents`                             | `50`                           | events per batch request, capped at `100`        |
+| `UseBatchEndpoint`                           | on                             | `DisableBatchEndpoint()` sends one per request   |
+| `CompressBatchThresholdBytes`                | `1024`                         | `0` disables gzip                                |
+| `FlushIntervalSeconds`                       | `15`                           | background delivery cadence                      |
+| `IngestBufferSize`                           | `512`                          | in-memory hand-off capacity                      |
+| `MaxQueueSize`                               | `10000`                        | oldest events dropped past the cap               |
+| `MaxAttempts`                                | `12`                           | `0` means retry until `MaxEventAgeSeconds`        |
+| `BaseBackoffSeconds` / `MaxBackoffSeconds`   | `2` / `300`                    | exponential, ±20% jitter                         |
+| `MaxEventAgeSeconds`                         | `86400` (24 hours)             | the collector's own event time window; `0` disables it |
+| `RequestTimeoutSeconds`                      | `15`                           | per HTTP attempt                                 |
+| `MaxViewabilityTime`                         | `1800`                         | matches the collector's own limit                |
+| `SendEventTime`                              | on                             | `DisableEventTime()` turns it off                |
+| `Debug`, `DebugKey`, `DevKey`                | off                            | collector debug/dev mode                         |
+| `UserID`, `SendInstallIDAsUID`               | empty, off                     | see below                                        |
+| `AutoHideOnBackground`                       | on                             | `DisableAutoHideOnBackground()` turns it off      |
 
-# Editing this README
+## Behaviour worth knowing
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+**Sessions.** The session id is generated on device and rotates after
+`SessionTimeoutSeconds` of inactivity, including inactivity while the app was
+not running — it is persisted, so a relaunch inside the window continues the
+same session. A queued event keeps the session it was tracked in, even if it is
+delivered days later.
 
-## Suggestions for a good README
+**Delivery order.** Events are delivered in insertion order — within a batch, and
+across the batches a delivery cycle sends — because the collector keeps
+per-session last-event timestamps and a `close` arriving before its `view` would
+distort the session.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+**Drops.** Events are discarded only when the collector rejects them permanently
+(`400`, or an individual rejection inside a batch), the attempt budget is spent,
+they exceed `MaxEventAgeSeconds`, the queue is over `MaxQueueSize` (oldest
+first), or the ingest buffer overflows because the writer cannot keep up. Every
+drop increments `Stats().Dropped` and, if a logger is attached, is logged.
+A tracker that is temporarily disabled server-side is retried, not dropped,
+whether that arrives as a `423` or as a per-event rejection in a batch.
 
-## Name
-Choose a self-explaining name for your project.
+**Event time.** Each event reports when it happened on the device (`et`), so an
+event queued offline keeps its own timestamp instead of being recorded with its
+delivery time. The collector only accepts event times within its own window (24
+hours back, five minutes forward), which is why `MaxEventAgeSeconds` defaults to
+the same 24 hours — an older event would be rejected anyway.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+A device with a badly wrong clock would have every event refused on its
+timestamp. Those events are kept rather than dropped, and after a handful of
+fresh events are refused the SDK stops sending `et` for the rest of the process:
+a wrong clock then costs the on-device timestamp instead of the whole event
+stream. `DisableEventTime()` makes that the starting point.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+**Install id.** `InstallID()` is a random, persisted, pseudonymous id. It is
+never sent unless `SendInstallIDAsUID` is enabled, and an explicit `SetUserID`
+always wins over it.
