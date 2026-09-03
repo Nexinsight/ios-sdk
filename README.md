@@ -12,7 +12,7 @@ source 'https://cdn.cocoapods.org/'
 platform :ios, '13.0'
 
 target 'MyApp' do
-  pod 'NexInsightCore', '~> 0.1'
+  pod 'nexinsight', '~> 0.1'
 end
 ```
 
@@ -21,6 +21,9 @@ Then run `pod install`. The first time on a machine, register the spec repo:
 ```sh
 pod repo add nexinsight-specs git@gitlab.adtelligent.com:nexinsight/sdk/podspecs.git
 ```
+
+The pod is named `nexinsight`, but the module inside the framework is
+`NexInsightCore` — so you still `import NexInsightCore` in code.
 
 The pod ships a static `xcframework` (device `arm64`, simulator
 `arm64`/`x86_64`) and links `libsqlite3` for you.

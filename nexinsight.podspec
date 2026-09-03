@@ -1,10 +1,10 @@
 Pod::Spec.new do |s|
-  s.name     = 'NexInsightCore'
+  s.name     = 'nexinsight'
   s.version  = '0.1.0'
   s.summary  = 'NexInsight analytics event SDK for iOS.'
 
   s.description = <<~DESC
-    NexInsightCore is the iOS build of the NexInsight event SDK: a persistent,
+    The iOS build of the NexInsight event SDK: a persistent,
     offline-tolerant queue for screen view, session and identity events that
     batches them and delivers them to the NexInsight collector.
 
@@ -34,6 +34,12 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '13.0'
 
   s.vendored_frameworks = 'NexInsightCore.xcframework'
+
+  # The module name is baked into the xcframework by gomobile and does not
+  # follow the pod name: consumers depend on `nexinsight` but write
+  # `import NexInsightCore`. Declaring it keeps CocoaPods' import validation
+  # honest about which module this pod actually exposes.
+  s.module_name = 'NexInsightCore'
 
   # gomobile emits a static framework, so the consumer's link step has to
   # resolve the framework's own externals. CFNetwork/CoreFoundation/Foundation/
