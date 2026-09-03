@@ -1,3 +1,32 @@
+# NexInsightCore (iOS)
+
+## Installation
+
+The pod lives in a private spec repo, so add that source alongside the CDN in
+your `Podfile`:
+
+```ruby
+source 'git@gitlab.adtelligent.com:nexinsight/sdk/podspecs.git'
+source 'https://cdn.cocoapods.org/'
+
+platform :ios, '13.0'
+
+target 'MyApp' do
+  pod 'NexInsightCore', '~> 0.1'
+end
+```
+
+Then run `pod install`. The first time on a machine, register the spec repo:
+
+```sh
+pod repo add nexinsight-specs git@gitlab.adtelligent.com:nexinsight/sdk/podspecs.git
+```
+
+The pod ships a static `xcframework` (device `arm64`, simulator
+`arm64`/`x86_64`) and links `libsqlite3` for you.
+
+## Usage
+
 ### Swift (iOS)
 
 ```swift
