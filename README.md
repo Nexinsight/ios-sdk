@@ -6,7 +6,7 @@ The pod lives in a private spec repo, so add that source alongside the CDN in
 your `Podfile`:
 
 ```ruby
-source 'git@github.com:Nexinsight/ios-sdk/podspecs.git'
+source 'git@github.com:Nexinsight/ios-sdk-podspecs.git'
 source 'https://cdn.cocoapods.org/'
 
 platform :ios, '13.0'
@@ -19,7 +19,7 @@ end
 Then run `pod install`. The first time on a machine, register the spec repo:
 
 ```sh
-pod repo add nexinsight-specs git@github.com/Nexinsight/ios-sdk/podspecs.git
+pod repo add nexinsight-specs git@github.com/Nexinsight/ios-sdk-podspecs.git
 ```
 
 The pod ships a static `xcframework` (device `arm64`, simulator
