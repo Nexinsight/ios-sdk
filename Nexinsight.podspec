@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = "Nexinsight"
-  s.version          = "0.1.8"
+  s.version          = "0.1.9"
   s.summary          = "Nexinsight iOS SDK for tracking events in your app."
   s.description      = <<-DESC
     Nexinsight iOS SDK. Prebuilt static xcframework that lets iOS apps send screen, session and custom events to Nexinsight.
@@ -15,15 +15,11 @@ Pod::Spec.new do |s|
   # The xcframework lives in this repo; a git tag equal to s.version marks each release.
   s.source           = { :git => "https://github.com/Nexinsight/ios-sdk.git", :tag => s.version.to_s }
 
-  s.platform              = :ios, "13.0"
   s.ios.deployment_target = "13.0"
-  s.swift_version         = "5.0"
 
   s.vendored_frameworks = "Nexinsight.xcframework"
   s.static_framework    = true
-  s.preserve_paths      = "Nexinsight.xcframework"
-
-  # The Swift module exported by the binary is `Nexinsight` (import Nexinsight).
+  
   s.module_name = "Nexinsight"
 
   s.frameworks = "Foundation"
