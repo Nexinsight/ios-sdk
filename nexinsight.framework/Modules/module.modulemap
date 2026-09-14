@@ -1,8 +1,0 @@
-framework module "nexinsight" {
-	header "ref.h"
-    header "Eventsdk.objc.h"
-    header "Universe.objc.h"
-    header "nexinsight.h"
-
-    export *
-}
