@@ -22,8 +22,7 @@ Then run `pod install`. The first time on a machine, register the spec repo:
 pod repo add nexinsight-ios-sdk git@github.com:Nexinsight/ios-sdk.git
 ```
 
-The pod ships a static `xcframework` (device `arm64`, simulator
-`arm64`/`x86_64`) and links `libsqlite3` for you.
+The pod ships a static `xcframework` (device `arm64`, simulator `arm64`) and links `libsqlite3` for you.
 
 ## Usage
 
