@@ -12,7 +12,7 @@ source 'https://cdn.cocoapods.org/'
 platform :ios, '13.0'
 
 target 'MyApp' do
-  pod 'nexinsight', '~> 0.1'
+  pod 'Nexinsight', '~> 0.1'
 end
 ```
 

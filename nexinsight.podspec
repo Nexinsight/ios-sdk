@@ -19,9 +19,9 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = "13.0"
   s.swift_version         = "5.0"
 
-  s.vendored_frameworks = "nexinsight.xcframework"
+  s.vendored_frameworks = "Nexinsight.xcframework"
   s.static_framework    = true
-  s.preserve_paths      = "nexinsight.xcframework"
+  s.preserve_paths      = "Nexinsight.xcframework"
 
   # The Swift module exported by the binary is `Nexinsight` (import Nexinsight).
   s.module_name = "Nexinsight"
