@@ -6,7 +6,7 @@ The pod lives in a private spec repo, so add that source alongside the CDN in
 your `Podfile`:
 
 ```ruby
-source 'git@github.com:Nexinsight/ios-sdk-podspecs.git'
+source 'git@github.com:Nexinsight/ios-sdk.git'
 source 'https://cdn.cocoapods.org/'
 
 platform :ios, '13.0'
