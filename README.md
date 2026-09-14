@@ -30,7 +30,7 @@ The pod ships a static `xcframework` (device `arm64`, simulator
 ### Swift (iOS)
 
 ```swift
-import nexinsight
+import Nexinsight
 
 let dbPath = FileManager.default
     .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
