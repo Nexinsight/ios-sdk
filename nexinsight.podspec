@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = "nexinsight"
-  s.version          = "0.1.2"
+  s.version          = "0.1.5"
   s.summary          = "Nexinsight iOS SDK for tracking events in your app."
   s.description      = <<-DESC
     Nexinsight iOS SDK. Prebuilt static xcframework that lets iOS apps send screen, session and custom events to Nexinsight.
