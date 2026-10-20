@@ -12,7 +12,7 @@ source 'https://cdn.cocoapods.org/'
 platform :ios, '13.0'
 
 target 'MyApp' do
-  pod 'Nexinsight', '~> 0.1'
+  pod 'Nexinsight', '~> 0.2'
 end
 ```
 
@@ -41,6 +41,7 @@ cfg.setAppInfo("MyApp", version: appVersion, build: appBuild)
 cfg.flushIntervalSeconds = 15
 
 guard let tracker = EventsdkTracker(cfg) else { return }   // nil if the queue cannot be opened
+if let url = launchURL { tracker.setDeepLink(url.absoluteString) }   // before the first view
 try? tracker.trackView("home")
 tracker.onBackground()      // hook to UIApplication.didEnterBackgroundNotification
 try? tracker.close(3000)
@@ -48,6 +49,73 @@ try? tracker.close(3000)
 
 Methods that return an error in Go are imported as throwing Swift methods
 (`trackView`, `track`, `identify`, `flush`, `close`); the rest are plain calls.
+
+### Deep links
+
+Call `setDeepLink` with the URL the app was opened with before the first
+`trackView` of the launch, and again whenever a URL arrives while the app is
+running. The next event carries it as `ref`; see the changelog for the session
+rules.
+
+Scene-based apps (`SceneDelegate`):
+
+```swift
+func scene(_ scene: UIScene, willConnectTo session: UISceneSession,
+           options connectionOptions: UIScene.ConnectionOptions) {
+    if let url = connectionOptions.urlContexts.first?.url
+        ?? connectionOptions.userActivities.first?.webpageURL {
+        tracker.setDeepLink(url.absoluteString)
+    }
+    try? tracker.trackView("home")
+}
+
+func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    URLContexts.first.map { tracker.setDeepLink($0.url.absoluteString) }
+}
+
+func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+    userActivity.webpageURL.map { tracker.setDeepLink($0.absoluteString) }
+}
+```
+
+`AppDelegate`-only apps:
+
+```swift
+func application(_ application: UIApplication,
+                 didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+    if let url = launchOptions?[.url] as? URL {
+        tracker.setDeepLink(url.absoluteString)
+    }
+    try? tracker.trackView("home")
+    return true
+}
+
+func application(_ app: UIApplication, open url: URL,
+                 options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+    tracker.setDeepLink(url.absoluteString)
+    return true
+}
+
+func application(_ application: UIApplication, continue userActivity: NSUserActivity,
+                 restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+    userActivity.webpageURL.map { tracker.setDeepLink($0.absoluteString) }
+    return true
+}
+```
+
+SwiftUI:
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .onOpenURL { url in tracker.setDeepLink(url.absoluteString) }
+        }
+    }
+}
+```
 
 ## API
 
@@ -62,6 +130,9 @@ Methods that return an error in Go are imported as throwing Swift methods
 | `SetScreen(name)` / `CurrentScreen()`   | track the screen without emitting an event                      |
 | `SetUserID(uid)` / `UserID()`           | the `uid` parameter                                             |
 | `SessionID()` / `ResetSession()`        | current session; force a new one (e.g. on logout)               |
+| `SetDeepLink(uri)` / `DeepLink()`       | URI the app was opened with; sent as `ref` on the next event    |
+| `SessionOrigin()`                       | `ref` of the current session's first event                      |
+| `OTP()`                                 | MyGaru token held by auto identification, if any                |
 | `InstallID()`                           | stable pseudonymous installation id                             |
 | `OnForeground()` / `OnBackground()`     | lifecycle hooks                                                 |
 | `FlushAsync()` / `Flush(timeoutMillis)` | trigger delivery; the blocking form waits and reports leftovers |
@@ -102,6 +173,12 @@ fields you need. `DatabasePath` must be in the app's private storage
 | `Debug`, `DebugKey`, `DevKey`              | off                            | collector debug/dev mode                               |
 | `UserID`, `SendInstallIDAsUID`             | empty, off                     | see below                                              |
 | `AutoHideOnBackground`                     | on                             | `DisableAutoHideOnBackground()` turns it off           |
+| `DeepLinkStartsNewSession`                 | on                             | `DisableDeepLinkSessionRotation()` turns it off        |
+| `AutoIdentify`                             | on                             | `DisableAutoIdentify()` turns it off                   |
+| `MyGaruPartnerID`                          | collector's partner id         | `p` parameter of the identification request            |
+| `MyGaruIdentURL`                           | `https://ident.mygaru.com/v2/id` | must be an absolute http(s) URL; override for staging |
+| `IdentifyTimeoutSeconds`                   | `5`                            | bound of one token fetch                               |
+| `IdentifyAfterIdleSeconds`                 | `600`                          | idle gap after which a fresh token is fetched; `0` disables |
 
 ## Behaviour worth knowing
 
@@ -139,3 +216,41 @@ stream. `DisableEventTime()` makes that the starting point.
 **Install id.** `InstallID()` is a random, persisted, pseudonymous id. It is
 never sent unless `SendInstallIDAsUID` is enabled, and an explicit `SetUserID`
 always wins over it.
+
+## Changelog
+
+### 0.2.0
+
+**Deep links.** `setDeepLink(uri)` records the URI the app was opened with
+(open-URL or universal link). The next event carries it as `ref` instead of the
+previous screen, so the collector records it as the session origin. Exactly one
+event carries it. Because the collector locks a session's origin from its first
+event, a deep link that arrives after the current session already sent an event
+starts a new session; disable this with `disableDeepLinkSessionRotation()` to
+keep the session and still send the link as `ref`. Empty or blank URIs are
+ignored. New accessors: `deepLink()` returns the link still waiting to be sent,
+`sessionOrigin()` returns the `ref` of the current session's first event.
+
+Call it before the first `trackView` of the launch, and again whenever the app
+receives a URL while running; see [Deep links](#deep-links) for examples.
+
+**Automatic MyGaru identification.** Enabled by default. The SDK fetches a
+MyGaru one-time token in the background and attaches it once as `otp` to the
+next regular event (`view`/`close`/`hide`); no `ident` event is emitted. Fetches
+happen on tracker start, on every session rotation (inactivity, `resetSession`,
+deep link) and when an event or `onForeground` follows more than
+`identifyAfterIdleSeconds` of inactivity. The fetch never blocks the caller, is
+bounded by `identifyTimeoutSeconds`, and is cancelled by `close`. The token lives
+in memory only. A failure is logged once and events simply carry no `otp`; this
+is typical over Wi-Fi, where the endpoint lacks carrier data. An explicit
+`Event.setOTP` wins for that event, and `identify(otp)` remains the manual
+route. `otp()` returns the token currently held. Opt out with
+`cfg.disableAutoIdentify()` before creating the tracker.
+
+New `Config` fields: `deepLinkStartsNewSession`, `autoIdentify`,
+`myGaruPartnerID`, `myGaruIdentURL`, `identifyTimeoutSeconds`,
+`identifyAfterIdleSeconds` (see Configuration above).
+
+**Session origin persistence.** Whether the current session already has an
+origin is now persisted, so a restart within the session window does not forget
+it.

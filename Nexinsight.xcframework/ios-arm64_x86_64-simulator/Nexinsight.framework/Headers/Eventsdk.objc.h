@@ -191,13 +191,64 @@ DisableAutoHideOnBackground.
  */
 @property (nonatomic) BOOL autoHideOnBackground;
 /**
+ * DeepLinkStartsNewSession makes Tracker.SetDeepLink rotate the session when
+the collector has already locked the current session's origin (it takes
+the "ref" of the first event only), so that the deep link becomes the
+origin of a fresh session instead of being lost. Enabled by default;
+disable with DisableDeepLinkSessionRotation.
+ */
+@property (nonatomic) BOOL deepLinkStartsNewSession;
+/**
+ * AutoIdentify makes the SDK fetch a MyGaru one-time token (OTP) in the
+background and attach it as the "otp" parameter of the next regular event
+(view/close/hide) — no ident event is emitted. The collector exchanges it
+for a stable identity and keeps that in its own session, so one token per
+session is enough. Fetches happen on tracker start, on every session
+rotation and after IdentifyAfterIdleSeconds of inactivity. The fetch
+never blocks a Track call; without carrier enrichment (Wi-Fi) it fails
+quietly. Enabled by default; disable with DisableAutoIdentify.
+ */
+@property (nonatomic) BOOL autoIdentify;
+/**
+ * MyGaruPartnerID is the partner id sent to the identification endpoint.
+Defaults to DefaultMyGaruPartnerID.
+ */
+@property (nonatomic) NSString* _Nonnull myGaruPartnerID;
+/**
+ * MyGaruIdentURL is the identification endpoint. Defaults to
+DefaultMyGaruIdentURL; overridable for a staging endpoint or a test.
+ */
+@property (nonatomic) NSString* _Nonnull myGaruIdentURL;
+/**
+ * IdentifyTimeoutSeconds bounds one OTP fetch. Defaults to 5.
+ */
+@property (nonatomic) long identifyTimeoutSeconds;
+/**
+ * IdentifyAfterIdleSeconds is the idle gap between two events of the same
+session after which a fresh OTP is fetched: it matches the collector-side
+session TTL (600 s), past which the collector has forgotten the identity
+it exchanged earlier. Defaults to 600; 0 disables the idle rule.
+ */
+@property (nonatomic) long identifyAfterIdleSeconds;
+/**
  * DisableAutoHideOnBackground turns the automatic background hide event off.
  */
 - (void)disableAutoHideOnBackground;
 /**
+ * DisableAutoIdentify turns the background MyGaru OTP fetch off; identity can
+still be sent manually via Tracker.Identify or Event.SetOTP.
+ */
+- (void)disableAutoIdentify;
+/**
  * DisableBatchEndpoint makes the SDK send one request per event.
  */
 - (void)disableBatchEndpoint;
+/**
+ * DisableDeepLinkSessionRotation keeps the current session when a deep link
+arrives after its origin was already sent; the link is still sent as "ref" on
+the next event, but the collector will not record it as the session origin.
+ */
+- (void)disableDeepLinkSessionRotation;
 /**
  * DisableEventTime stops reporting the on-device event time, leaving the
 collector to timestamp events when it receives them.
@@ -240,7 +291,8 @@ value removes it.
 - (void)setOTP:(NSString* _Nullable)otp;
 /**
  * SetPrevScreen sets the previous screen name, sent as the "ref" parameter; the
-collector uses it as the session origin.
+collector uses the ref of a session's first event as its origin. A pending
+deep link (Tracker.SetDeepLink) overrides this value at Track time.
  */
 - (void)setPrevScreen:(NSString* _Nullable)name;
 /**
@@ -334,6 +386,11 @@ picked up by the next run.
  */
 - (NSString* _Nonnull)currentScreen;
 /**
+ * DeepLink returns the deep link waiting to be sent on the next event, or ""
+once an event carried it.
+ */
+- (NSString* _Nonnull)deepLink;
+/**
  * Flush persists the in-memory buffer and delivers the queue, waiting up to
 timeoutMillis. It returns an error when events are still pending afterwards,
 which is normal while offline. Do not call it on the UI thread.
@@ -352,6 +409,11 @@ which is normal while offline. Do not call it on the UI thread.
  */
 - (NSString* _Nonnull)installID;
 - (EventsdkEvent* _Nullable)newEvent:(NSString* _Nullable)eventType;
+/**
+ * OTP returns the MyGaru token fetched last by auto identification, or "" when
+none was obtained yet. It is kept in memory only.
+ */
+- (NSString* _Nonnull)otp;
 /**
  * OnBackground should be called when the app is backgrounded. With
 Config.AutoHideOnBackground it emits a hide event for the current screen
@@ -379,6 +441,22 @@ returns the new session id.
 header.
  */
 - (NSString* _Nonnull)sessionID;
+/**
+ * SessionOrigin returns the origin the collector recorded for the current
+session: the "ref" of its first event (a deep link or previous screen), or
+"" when that event carried none or no event was sent in it yet.
+ */
+- (NSString* _Nonnull)sessionOrigin;
+/**
+ * SetDeepLink records the URI the app was opened with (Android Intent data,
+iOS open-URL or universal link). It is sent as "ref" on the next event only,
+overriding the previous screen. The collector takes a session's origin from
+the first event it sees for that session, so when the current session already
+had an event sent, the session is rotated (unless
+Config.DeepLinkStartsNewSession is off) and the deep link opens a new one.
+Empty or blank URIs are ignored.
+ */
+- (void)setDeepLink:(NSString* _Nullable)uri;
 /**
  * SetLogger installs (or with nil removes) the diagnostics sink.
  */
@@ -433,6 +511,16 @@ starts the visibility timer used by TrackHideAuto/OnBackground.
 app can point the SDK at a staging collector or a local proxy.
  */
 FOUNDATION_EXPORT NSString* _Nonnull const EventsdkDefaultEndpoint;
+/**
+ * MyGaru identification defaults; the partner id is the one the collector
+itself uses when exchanging tokens.
+ */
+FOUNDATION_EXPORT NSString* _Nonnull const EventsdkDefaultMyGaruIdentURL;
+/**
+ * MyGaru identification defaults; the partner id is the one the collector
+itself uses when exchanging tokens.
+ */
+FOUNDATION_EXPORT NSString* _Nonnull const EventsdkDefaultMyGaruPartnerID;
 /**
  * EventClose is emitted when a screen or the app is closed; it carries the
 time the screen was visible.
