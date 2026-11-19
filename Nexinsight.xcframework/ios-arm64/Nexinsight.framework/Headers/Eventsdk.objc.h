@@ -555,12 +555,17 @@ FOUNDATION_EXPORT const int64_t EventsdkLogInfo;
  * Log levels passed to Logger.Log.
  */
 FOUNDATION_EXPORT const int64_t EventsdkLogWarn;
-/**
- * Version is the SDK core version, reported in the synthesised user agent.
- */
-FOUNDATION_EXPORT NSString* _Nonnull const EventsdkVersion;
 
 @interface Eventsdk : NSObject
+/**
+ * ErrAlreadyOpen is returned by NewTracker when another live tracker in this
+process already uses the same database. Two trackers on one queue would
+release each other's in-flight leases and deliver the same events twice;
+reuse the existing tracker, or Close it first.
+ */
++ (NSError* _Nullable) errAlreadyOpen;
++ (void) setErrAlreadyOpen:(NSError* _Nullable)v;
+
 /**
  * ErrClosed is returned by a tracker that has been closed.
  */
@@ -578,6 +583,17 @@ FOUNDATION_EXPORT NSString* _Nonnull const EventsdkVersion;
  */
 + (NSError* _Nullable) errNoDatabasePath;
 + (void) setErrNoDatabasePath:(NSError* _Nullable)v;
+
+/**
+ * Version is the SDK core version, reported in the synthesised user agent.
+It is a var, not a const, so build scripts can stamp it at link time:
+
+	go build -ldflags "-X gitlab.adtelligent.com/nexinsight/sdk/core.Version=1.2.3"
+
+The value here is the fallback for plain `go build` without ldflags.
+ */
++ (NSString* _Nonnull) version;
++ (void) setVersion:(NSString* _Nonnull)v;
 
 @end
 

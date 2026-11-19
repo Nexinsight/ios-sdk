@@ -2,11 +2,11 @@
 
 ## Installation
 
-The pod lives in a private spec repo, so add that source alongside the CDN in
-your `Podfile`:
+The pod lives in its own spec repo, so add that source alongside the CDN in
+your `Podfile`. Use the HTTPS URL; it needs no SSH key on developer machines or CI:
 
 ```ruby
-source 'git@github.com:Nexinsight/ios-sdk.git'
+source 'https://github.com/Nexinsight/ios-sdk.git'
 source 'https://cdn.cocoapods.org/'
 
 platform :ios, '13.0'
@@ -19,10 +19,10 @@ end
 Then run `pod install`. The first time on a machine, register the spec repo:
 
 ```sh
-pod repo add nexinsight-podspecs git@github.com:Nexinsight/ios-sdk.git
+pod repo add nexinsight-podspecs https://github.com/Nexinsight/ios-sdk.git
 ```
 
-The pod ships a static `xcframework` (device `arm64`, simulator `arm64`) and links `libsqlite3` for you.
+The pod ships a static `xcframework` (device `arm64`, simulator `arm64` and `x86_64`) and links `libsqlite3` for you.
 
 ## Usage
 
@@ -182,6 +182,14 @@ fields you need. `DatabasePath` must be in the app's private storage
 
 ## Behaviour worth knowing
 
+**One tracker per database.** Create one `EventsdkTracker` per process and keep
+it for the process lifetime. While a tracker is open, creating another one on
+the same `DatabasePath` fails (`EventsdkTracker(cfg)` returns `nil`, and the
+error is `Eventsdk.errAlreadyOpen()`). Aliases of the same path count too. Two
+trackers on one queue would deliver the same events twice. `close` the old
+tracker before opening a new one. An app extension runs in its own process and
+needs its own database file.
+
 **Sessions.** The session id is generated on device and rotates after
 `SessionTimeoutSeconds` of inactivity, including inactivity while the app was
 not running — it is persisted, so a relaunch inside the window continues the
@@ -218,6 +226,19 @@ never sent unless `SendInstallIDAsUID` is enabled, and an explicit `SetUserID`
 always wins over it.
 
 ## Changelog
+
+### 0.2.2
+
+**One tracker per database.** Creating a second tracker on a database another
+live tracker in the process uses now fails with `Eventsdk.errAlreadyOpen()`.
+Before, it started silently and released the first tracker's in-flight
+deliveries, so the same events reached the collector twice.
+
+**Version reporting.** The version is stamped at build time and reported in the
+User-Agent. `EventsdkVersion` is no longer a constant; read it with
+`Eventsdk.version()`.
+
+**Install.** The spec repo source is now the HTTPS URL, so no SSH key is needed.
 
 ### 0.2.0
 
