@@ -227,6 +227,10 @@ always wins over it.
 
 ## Changelog
 
+### 0.2.3
+
+**Smaller binary.** Built with `-trimpath` and without debug symbols, so the framework no longer embeds build-machine paths. No behaviour or API changes.
+
 ### 0.2.2
 
 **One tracker per database.** Creating a second tracker on a database another
